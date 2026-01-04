@@ -117,42 +117,55 @@ fun BattleshipGameScreen(playerName: String) { // Recibimos el nombre del Login
     // 3. LÓGICA DE RED (POLLING LOOP)
     // ==========================================
     // Este bucle se activa cuando entramos en WAITING o PLAYING
+    // ==========================================
+    // 3. LÓGICA DE RED (CORREGIDA PARA DETECTAR VICTORIA)
+    // ==========================================
     LaunchedEffect(gameState) {
-        if (gameState != "LOBBY") {
-            while (true) {
+        // Ejecutamos el bucle si estamos esperando, jugando O SI HA TERMINADO (para recibir el mensaje final)
+        if (gameState == "WAITING" || gameState == "PLAYING" || gameState == "FINISHED") {
+            while (gameState != "FINISHED") { // El bucle para cuando detectamos el fin
                 try {
-                    // Preguntamos al servidor: "¿Cómo va la partida?"
                     val response = BattleshipRetrofit.instance.getGameState(gameId)
 
-                    // A. ¿Ha entrado el rival?
-                    if (gameState == "WAITING" && response.player2 != null) {
-                        gameState = "PLAYING"
-                        serverMessage = "¡Rival encontrado! Batalla iniciada."
+                    // 1. PRIMERA COMPROBACIÓN: ¿HAY GANADOR? (PRIORIDAD ABSOLUTA)
+                    if (response.winner != null) {
+                        if (response.winner == playerName) {
+                            serverMessage = "🏆 ¡VICTORIA! HAS HUNDIDO LA FLOTA 🏆"
+                        } else {
+                            serverMessage = "💀 DERROTA... TUS BARCOS HAN CAÍDO 💀"
+                        }
+                        gameState = "FINISHED" // Esto detendrá el bucle en la siguiente vuelta
+                        // Forzamos la actualización visual del tablero una última vez si quieres
                     }
 
-                    // B. Gestión de Turnos
-                    if (response.turn == playerName) {
-                        myTurn = true
-                        serverMessage = "🎯 TU TURNO - ¡DISPARA!"
-
-                        // C. Actualizar tablero si el rival disparó
-                        if (response.lastMoveRow != null && response.lastMoveCol != null) {
-                            val index = response.lastMoveRow * 5 + response.lastMoveCol
-                            // Aquí podrías marcar dónde te han disparado.
-                            // Por simplicidad, actualizamos estado local si fuera necesario.
+                    // 2. Si no hay ganador, seguimos jugando
+                    else {
+                        // A. ¿Ha entrado el rival?
+                        if (gameState == "WAITING" && response.status == "PLAYING") {
+                            gameState = "PLAYING"
+                            serverMessage = "¡Enemigo detectado! A LA BATALLA."
                         }
-                    } else {
-                        myTurn = false
-                        serverMessage = "⏳ Esperando disparo enemigo..."
+
+                        // B. Gestión de Turnos
+                        if (gameState == "PLAYING") {
+                            if (response.turn == playerName) {
+                                myTurn = true
+                                serverMessage = "🎯 TU TURNO - ¡DISPARA!"
+                            } else {
+                                myTurn = false
+                                serverMessage = "⏳ Esperando disparo enemigo..."
+                            }
+                        }
                     }
 
                 } catch (e: Exception) {
-                    println("Polling error: ${e.message}")
-                    // No mostramos Toast aquí para no saturar la pantalla cada 3 segundos
+                    println("Error de conexión: ${e.message}")
                 }
 
-                // Esperamos 3 segundos antes de volver a preguntar (Polling)
-                kotlinx.coroutines.delay(3000)
+                // Esperamos 3 segundos antes de volver a preguntar
+                if (gameState != "FINISHED") {
+                    kotlinx.coroutines.delay(3000)
+                }
             }
         }
     }
@@ -307,8 +320,7 @@ fun BattleshipGameScreen(playerName: String) { // Recibimos el nombre del Login
 
                                             // 2. Actualizar visualmente
                                             val newList = gridState.toMutableList()
-                                            if (respuesta.status == "HIT" || respuesta.lastMoveRow != null) {
-                                                // Ajusta esta condición según lo que devuelva realmente tu API
+                                            if (respuesta.status == "HIT") {
                                                 newList[index] = "💥"
                                                 Toast.makeText(context, "¡IMPACTO!", Toast.LENGTH_SHORT).show()
                                             } else {

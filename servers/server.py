@@ -96,51 +96,45 @@ def handle_attack():
     game = games.get(game_id)
     if not game: return jsonify({"status": "ERROR"})
 
-    # Calculamos el índice lineal (0-24) basado en fila/columna
     target_index = row * 5 + col
-    result = "MISS" # Por defecto es Agua 💧
+    result = "MISS"
 
-    # LÓGICA DE IMPACTO
-    # Si dispara el Jugador 1, miramos los barcos del Jugador 2
+    # 1. LÓGICA DE IMPACTO
     if shooter == game['player1']:
         if target_index in game['ships_p2']:
-            result = "HIT" 💥
-            # Opcional: Podrías quitar el barco de la lista para saber cuándo hundió todos
-
-    # Si dispara el Jugador 2, miramos los barcos del Jugador 1
+            result = "HIT"
     elif shooter == game['player2']:
         if target_index in game['ships_p1']:
-            result = "HIT" 💥
+            result = "HIT"
 
-    # Cambiamos el turno
-    if shooter == game['player1']:
-        game['turn'] = game['player2']
-    else:
-        game['turn'] = game['player1']
+    # 2. CAMBIO DE TURNO
+    game['turn'] = game['player2'] if shooter == game['player1'] else game['player1']
 
-    # Guardamos el último movimiento para que el otro lo vea
+    # 3. ACTUALIZAR ÚLTIMO MOVIMIENTO
     game['lastMoveRow'] = row
     game['lastMoveCol'] = col
-    # Importante: Podrías querer enviar si fue HIT o MISS al otro jugador también
-# Truco rápido: Guardamos los aciertos en el estado del juego
+
+    # 4. COMPROBAR VICTORIA (VERSIÓN LIMPIA Y FINAL)
     if 'hits_p1' not in game: game['hits_p1'] = 0
     if 'hits_p2' not in game: game['hits_p2'] = 0
 
     if result == "HIT":
         if shooter == game['player1']:
             game['hits_p1'] += 1
-            if game['hits_p1'] >= 3: # Si hunde los 3 barcos
+            if game['hits_p1'] >= 3:
                 game['winner'] = game['player1']
+                game['status'] = "FINISHED" # Importante
         else:
             game['hits_p2'] += 1
             if game['hits_p2'] >= 3:
                 game['winner'] = game['player2']
+                game['status'] = "FINISHED"
 
     return jsonify({
         "status": result,
         "lastMoveRow": row,
         "lastMoveCol": col,
-        "winner": game.get('winner') # Importante devolver esto
+        "winner": game.get('winner')
     })
 
 if __name__ == '__main__':
