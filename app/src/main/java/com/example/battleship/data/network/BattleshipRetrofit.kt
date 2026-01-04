@@ -3,17 +3,17 @@ package com.example.battleship.data.network
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-// Usamos 'object' en lugar de 'class' para que solo exista una instancia en toda la app
 object BattleshipRetrofit {
-    // Esta es una dirección de prueba. Más adelante pondremos la de tu servidor real.
-    private const val BASE_URL = "https://jsonplaceholder.typicode.com/"
-
+    // CAMBIA ESTO por la IP de tu ordenador donde corre el servidor Python/Node
+    // Si usas el emulador de Android, usa "http://10.0.2.2:5000/"
+    // Si usas un móvil físico, usa la IP de tu PC (ej: "http://192.168.1.35:5000/")
+    const val BASE_URL = "http://10.0.2.2:5000/"
+    // Aquí creamos la instancia "Mágica" que MainActivity está buscando
     val instance: BattleshipApiService by lazy {
-        val retrofit = Retrofit.Builder()
+        Retrofit.Builder()
             .baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-
-        retrofit.create(BattleshipApiService::class.java)
+            .create(BattleshipApiService::class.java)
     }
 }
