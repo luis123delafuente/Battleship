@@ -7,39 +7,88 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 
-// Esta clase maneja la conexión con el satélite GPS
-class GpsSensor(private val context: Context, private val onLocationReceived: (Double, Double) -> Unit) : LocationListener {
+/**
+ * Handles GPS and Network location updates.
+ * This class acts as a wrapper around Android's [LocationManager] to simplify fetching coordinates.
+ *
+ * It utilizes a hybrid approach requesting updates from both GPS (satellites) and Network (Wi-Fi/Cell)
+ * to ensure coverage both indoors and outdoors.
+ *
+ * @property context The application or activity context.
+ * @property onLocationReceived Callback function invoked when coordinates (latitude, longitude) change.
+ */
+class GpsSensor(
+    private val context: Context,
+    private val onLocationReceived: (Double, Double) -> Unit
+) : LocationListener {
 
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
-    // Ignoramos el error de "Permisos" aquí porque los pediremos en el MainActivity antes de llamar a esto
+    /**
+     * Starts listening for location updates.
+     *
+     * It requests updates from two providers:
+     * 1. [LocationManager.GPS_PROVIDER]: High accuracy, uses satellites. Ideal for outdoors.
+     * 2. [LocationManager.NETWORK_PROVIDER]: Faster fix, uses Wi-Fi/Cell towers. Ideal for indoors.
+     *
+     * Note: The [SuppressLint] annotation is used because runtime permissions are handled
+     * and verified in the UI layer (MainActivity) before invoking this method.
+     */
     @SuppressLint("MissingPermission")
     fun start() {
-        // Pedimos actualizaciones:
-        // GPS_PROVIDER = Usa satélites (Más preciso, funciona fuera de casa)
-        // NETWORK_PROVIDER = Usa Wi-Fi/Antenas (Más rápido, mejor para interiores)
+        // Configuration: Update every 2 seconds (2000ms) or every 10 meters
+        val minTimeMs = 2000L
+        val minDistanceM = 10f
 
-        // Intentamos usar GPS primero
+        // Attempt to use GPS Provider (Precision)
         if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 10f, this)
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                minTimeMs,
+                minDistanceM,
+                this
+            )
         }
-        // También activamos red por si acaso el GPS no coge señal dentro de casa
+
+        // Attempt to use Network Provider (Speed/Indoors coverage)
         if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 10f, this)
+            locationManager.requestLocationUpdates(
+                LocationManager.NETWORK_PROVIDER,
+                minTimeMs,
+                minDistanceM,
+                this
+            )
         }
     }
 
+    /**
+     * Stops listening for updates to conserve battery life.
+     * This should be called when the Composable is disposed or the Activity pauses.
+     */
     fun stop() {
         locationManager.removeUpdates(this)
     }
 
+    /**
+     * Callback triggered by the system when a new location is detected.
+     */
     override fun onLocationChanged(location: Location) {
-        // ¡Tenemos coordenadas! Se las pasamos a la pantalla
+        // Pass the new coordinates to the UI callback
         onLocationReceived(location.latitude, location.longitude)
     }
 
-    // Funciones obligatorias pero que no usaremos
-    override fun onProviderEnabled(provider: String) {}
-    override fun onProviderDisabled(provider: String) {}
-    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    // --- Boilerplate methods required by LocationListener interface ---
+
+    override fun onProviderEnabled(provider: String) {
+        // Optional: Logic when user enables GPS/Network
+    }
+
+    override fun onProviderDisabled(provider: String) {
+        // Optional: Logic when user disables GPS/Network
+    }
+
+    @Deprecated("Deprecated in API level 29")
+    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
+
+    }
 }

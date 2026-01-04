@@ -6,61 +6,94 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 
-class OrientationSensor(context: Context, private val onOrientationChanged: (Float) -> Unit) : SensorEventListener {
+/**
+ * Helper class to compute the device's physical orientation (Azimuth/Compass heading).
+ *
+ * It implements a basic sensor fusion algorithm combining data from:
+ * 1. Accelerometer (Gravity vector).
+ * 2. Magnetometer (Geomagnetic field vector).
+ *
+ * @property context The application context to access system services.
+ * @property onOrientationChanged Callback invoked with the new azimuth in degrees (0-360).
+ */
+class OrientationSensor(
+    context: Context,
+    private val onOrientationChanged: (Float) -> Unit
+) : SensorEventListener {
+
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-    // Necesitamos dos sensores según Diapositiva 29 (Fusión básica) y 17
+    // We need both sensors to determine orientation relative to the Earth's frame
     private val accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     private val magnetometer = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
+    // Temporary storage for raw sensor data
     private var gravity: FloatArray? = null
     private var geomagnetic: FloatArray? = null
 
+    /**
+     * Starts listening to sensor updates.
+     * Uses [SensorManager.SENSOR_DELAY_UI] which provides a rate suitable for UI updates
+     * without consuming excessive battery.
+     */
     fun start() {
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
-        sensorManager.registerListener(this, magnetometer, SensorManager.SENSOR_DELAY_UI)
+        accelerometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        magnetometer?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
     }
 
+    /**
+     * Stops listening to sensor updates to save battery.
+     */
     fun stop() {
         sensorManager.unregisterListener(this)
     }
 
+    /**
+     * Called when sensor values change.
+     * This method performs the sensor fusion math to calculate the Azimuth.
+     */
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
 
-        // Guardamos los datos brutos (Diapositiva 43)
+        // 1. Cache the raw values from each sensor
         if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
             gravity = event.values
         } else if (event.sensor.type == Sensor.TYPE_MAGNETIC_FIELD) {
             geomagnetic = event.values
         }
 
-        // Si tenemos ambos datos, calculamos la orientación
+        // 2. Compute orientation only when both sensor datasets are available
         if (gravity != null && geomagnetic != null) {
             val r = FloatArray(9)
             val i = FloatArray(9)
 
-            // Implementación de la Diapositiva 17: getRotationMatrix
-            // Transforma del Device Frame al ENU Frame
+            // Calculate the Rotation Matrix (Transforms from Device Frame to World/ENU Frame)
             val success = SensorManager.getRotationMatrix(r, i, gravity, geomagnetic)
 
             if (success) {
                 val orientation = FloatArray(3)
-                // Implementación de la Diapositiva 41: getOrientation
-                // Convierte la matriz a Ángulos de Euler (Azimuth, Pitch, Roll)
+                // Convert the rotation matrix into Euler Angles (Azimuth, Pitch, Roll)
                 SensorManager.getOrientation(r, orientation)
 
-                // El Azimuth es el primer valor (índice 0) según Diapositiva 21
-                // Viene en radianes, lo pasamos a grados
+                // The Azimuth (compass bearing) is the first value (index 0)
+                // The API returns radians, so we convert to degrees
                 var azimuth = Math.toDegrees(orientation[0].toDouble()).toFloat()
 
-                // Normalizamos para que sea 0-360 grados
+                // Normalize the result to ensure a range of [0, 360] degrees
+                // (Math.toDegrees can return negative values for the western hemisphere)
                 if (azimuth < 0) azimuth += 360
 
+                // Send the result to the UI
                 onOrientationChanged(azimuth)
             }
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // No-op: We do not need to handle accuracy changes for this implementation
+    }
 }

@@ -24,21 +24,34 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
+/**
+ * Composable function representing the Login Screen.
+ *
+ * This screen handles:
+ * 1. User input for username (Captain's Name) and password.
+ * 2. Profile picture capture using the device camera (thumbnail).
+ * 3. Persistence of the username using [android.content.SharedPreferences].
+ *
+ * @param onLoginSuccess Callback triggered when the login is validated. Passes the username.
+ */
 @Composable
 fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     val context = LocalContext.current
 
-    // 1. LEER PREFERENCIAS (Sin 'remember' en la variable para forzar lectura fresca)
+    // 1. READ PREFERENCES
+    // We read directly from SharedPreferences to ensure we get the latest persisted data.
     val sharedPreferences = context.getSharedPreferences("BattleshipPrefs", Context.MODE_PRIVATE)
     val savedName = sharedPreferences.getString("USER_NAME", "") ?: ""
 
-    // Usamos savedName como valor inicial.
-    // key = savedName asegura que si por alguna razón extraña cambiase, se actualice.
+    // Initialize state with the saved name.
+    // 'key = savedName' ensures that if the underlying preference changes, the state is re-initialized.
     var username by remember(savedName) { mutableStateOf(savedName) }
     var password by remember { mutableStateOf("") }
 
+    // State to hold the captured profile image
     var imageBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
+    // Launcher to open the camera and get a preview bitmap
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
     ) { bitmap ->
@@ -48,18 +61,19 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1B2631)),
+            .background(Color(0xFF1B2631)), // Dark Navy Blue background
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "IDENTIFICACIÓN",
+            text = "IDENTIFICATION",
             style = MaterialTheme.typography.headlineLarge,
             color = Color.White
         )
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Profile Picture Circular Area
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -72,27 +86,32 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
             if (imageBitmap != null) {
                 Image(
                     bitmap = imageBitmap!!.asImageBitmap(),
-                    contentDescription = "Foto de perfil",
+                    contentDescription = "Profile Picture",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Tomar foto",
+                    contentDescription = "Take Photo",
                     tint = Color.White,
                     modifier = Modifier.size(50.dp)
                 )
             }
         }
-        Text("Toca para foto", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+        Text(
+            text = "Tap to take photo",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodySmall
+        )
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Username Input
         OutlinedTextField(
             value = username,
             onValueChange = { username = it },
-            label = { Text("Nombre de Capitán") },
+            label = { Text("Captain's Name") },
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.White,
                 unfocusedTextColor = Color.White,
@@ -103,10 +122,11 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Password Input
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Clave de Acceso") },
+            label = { Text("Access Code") },
             visualTransformation = PasswordVisualTransformation(),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = Color.White,
@@ -118,23 +138,25 @@ fun LoginScreen(onLoginSuccess: (String) -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Login Button
         Button(
             onClick = {
                 if (username.isNotEmpty() && password.isNotEmpty()) {
-                    // 2. GUARDADO SEGURO (COMMIT)
+                    // 2. SECURE SAVE (COMMIT)
                     val editor = sharedPreferences.edit()
                     editor.putString("USER_NAME", username)
 
-                    // ¡IMPORTANTE! Usamos commit() en vez de apply()
-                    // Esto congela la app 0.01 segundos para asegurar que se escribe en el disco
-                    val exito = editor.commit()
+                    // IMPORTANT! We use commit() instead of apply().
+                    // commit() writes synchronously to disk. This ensures the data is strictly saved
+                    // before the navigation to the next screen occurs.
+                    val success = editor.commit()
 
                     onLoginSuccess(username)
                 }
             },
             colors = ButtonDefaults.buttonColors(containerColor = Color.Cyan)
         ) {
-            Text("ENTRAR AL RADAR", color = Color.Black)
+            Text("ACCESS RADAR", color = Color.Black)
         }
     }
 }

@@ -58,10 +58,10 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Retrofit: Para conectar con la API
+    // Retrofit: To connect with the API
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    // Converter: Para que Android entienda los datos del servidor (JSON)
+    // Converter: So Android understands server's data (JSON)
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    // Coroutines: Para tareas en segundo plano
+    // Coroutines: For background tasks
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
